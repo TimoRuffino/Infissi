@@ -51,6 +51,29 @@ export const anomalieRouter = router({
       return anomalia;
     }),
 
+  update: publicProcedure
+    .input(z.object({
+      id: z.number(),
+      categoria: z.enum(["materiale_difettoso", "misura_errata", "danno_trasporto", "difetto_posa", "problema_accessorio", "non_conformita", "altro"]).optional(),
+      priorita: z.enum(["bassa", "media", "alta", "critica"]).optional(),
+      descrizione: z.string().optional(),
+      stato: z.enum(["aperta", "in_gestione", "risolta", "chiusa"]).optional(),
+    }))
+    .mutation(({ input }) => {
+      const idx = anomalie.findIndex((a) => a.id === input.id);
+      if (idx === -1) throw new Error("Anomalia non trovata");
+      const { id, ...updates } = input;
+      anomalie[idx] = { ...anomalie[idx], ...updates, updatedAt: new Date() };
+      return anomalie[idx];
+    }),
+
+  delete: publicProcedure.input(z.number()).mutation(({ input }) => {
+    const idx = anomalie.findIndex((a) => a.id === input);
+    if (idx === -1) throw new Error("Anomalia non trovata");
+    anomalie.splice(idx, 1);
+    return { success: true };
+  }),
+
   resolve: publicProcedure
     .input(z.object({
       id: z.number(),

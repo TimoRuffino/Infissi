@@ -120,6 +120,31 @@ export const garanzieRouter = router({
       return garanzia;
     }),
 
+  update: publicProcedure
+    .input(z.object({
+      id: z.number(),
+      tipo: z.enum(["prodotto", "posa", "accessorio", "vetro", "altro"]).optional(),
+      descrizione: z.string().optional(),
+      fornitore: z.string().optional(),
+      stato: z.enum(["attiva", "scaduta", "sospesa", "revocata"]).optional(),
+      documentoRif: z.string().optional(),
+      note: z.string().optional(),
+    }))
+    .mutation(({ input }) => {
+      const idx = garanzie.findIndex((g) => g.id === input.id);
+      if (idx === -1) throw new Error("Garanzia non trovata");
+      const { id, ...updates } = input;
+      garanzie[idx] = { ...garanzie[idx], ...updates, updatedAt: new Date() };
+      return garanzie[idx];
+    }),
+
+  delete: publicProcedure.input(z.number()).mutation(({ input }) => {
+    const idx = garanzie.findIndex((g) => g.id === input);
+    if (idx === -1) throw new Error("Garanzia non trovata");
+    garanzie.splice(idx, 1);
+    return { success: true };
+  }),
+
   stats: publicProcedure.query(() => {
     const today = new Date().toISOString().split("T")[0];
     const in90 = new Date();

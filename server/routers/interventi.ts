@@ -59,6 +59,30 @@ export const interventiRouter = router({
       return intervento;
     }),
 
+  update: publicProcedure
+    .input(z.object({
+      id: z.number(),
+      squadraId: z.number().nullable().optional(),
+      tipo: z.enum(["rilievo", "posa", "assistenza", "sopralluogo", "altro"]).optional(),
+      dataPianificata: z.string().optional(),
+      indirizzo: z.string().optional(),
+      note: z.string().optional(),
+    }))
+    .mutation(({ input }) => {
+      const idx = interventi.findIndex((i) => i.id === input.id);
+      if (idx === -1) throw new Error("Intervento non trovato");
+      const { id, ...updates } = input;
+      interventi[idx] = { ...interventi[idx], ...updates, updatedAt: new Date() };
+      return interventi[idx];
+    }),
+
+  delete: publicProcedure.input(z.number()).mutation(({ input }) => {
+    const idx = interventi.findIndex((i) => i.id === input);
+    if (idx === -1) throw new Error("Intervento non trovato");
+    interventi.splice(idx, 1);
+    return { success: true };
+  }),
+
   updateStato: publicProcedure
     .input(z.object({
       id: z.number(),

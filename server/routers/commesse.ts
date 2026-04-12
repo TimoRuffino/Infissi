@@ -1,11 +1,38 @@
 import { z } from "zod";
 import { publicProcedure, router } from "../_core/trpc";
+import { addCommessaToCliente } from "./clienti";
+
+// ── State machine: allowed transitions ──────────────────────────────────────
+const STATI_COMMESSA = ["preventivo", "aperta", "in_rilievo", "in_lavorazione", "in_produzione", "in_posa", "chiusa", "archiviata"] as const;
+type StatoCommessa = typeof STATI_COMMESSA[number];
+
+const TRANSIZIONI_VALIDE: Record<StatoCommessa, StatoCommessa[]> = {
+  preventivo:       ["aperta"],
+  aperta:           ["in_rilievo"],
+  in_rilievo:       ["in_lavorazione"],
+  in_lavorazione:   ["in_produzione"],
+  in_produzione:    ["in_posa"],
+  in_posa:          ["chiusa"],
+  chiusa:           ["archiviata"],
+  archiviata:       [],
+};
+
+function validateTransizione(statoAttuale: string, nuovoStato: string): void {
+  const allowed = TRANSIZIONI_VALIDE[statoAttuale as StatoCommessa];
+  if (!allowed || !allowed.includes(nuovoStato as StatoCommessa)) {
+    throw new Error(
+      `Transizione non consentita: ${statoAttuale} → ${nuovoStato}. ` +
+      `Transizioni valide da "${statoAttuale}": ${allowed?.join(", ") ?? "nessuna"}`
+    );
+  }
+}
 
 // In-memory store (replace with Drizzle queries when DB is available)
 let commesse: any[] = [
   {
     id: 1,
     codice: "COM-2026-001",
+    clienteId: 1,
     cliente: "Condominio Via Roma 15",
     indirizzo: "Via Roma 15",
     citta: "Palermo",
@@ -24,6 +51,7 @@ let commesse: any[] = [
   {
     id: 2,
     codice: "COM-2026-002",
+    clienteId: 2,
     cliente: "Villa Ferrara",
     indirizzo: "Via dei Giardini 42",
     citta: "Palermo",
@@ -42,6 +70,7 @@ let commesse: any[] = [
   {
     id: 3,
     codice: "COM-2026-003",
+    clienteId: 3,
     cliente: "Uffici Moretti S.r.l.",
     indirizzo: "Viale della Libertà 88",
     citta: "Palermo",
@@ -60,6 +89,7 @@ let commesse: any[] = [
   {
     id: 4,
     codice: "COM-2025-048",
+    clienteId: 4,
     cliente: "Scuola Elementare Pirandello",
     indirizzo: "Via Maqueda 200",
     citta: "Palermo",
@@ -78,6 +108,7 @@ let commesse: any[] = [
   {
     id: 5,
     codice: "COM-2026-004",
+    clienteId: 5,
     cliente: "Residence Blu Mare",
     indirizzo: "Lungomare Cristoforo Colombo 12",
     citta: "Palermo",
@@ -130,6 +161,7 @@ export const commesseRouter = router({
     .input(
       z.object({
         codice: z.string().min(1),
+        clienteId: z.number().optional(),
         cliente: z.string().min(1),
         indirizzo: z.string().optional(),
         citta: z.string().optional(),
@@ -142,9 +174,12 @@ export const commesseRouter = router({
     )
     .mutation(({ input }) => {
       const now = new Date();
+      const id = nextId++;
+      const { clienteId: inputClienteId, ...rest } = input;
       const commessa = {
-        id: nextId++,
-        ...input,
+        id,
+        clienteId: inputClienteId ?? null,
+        ...rest,
         stato: "aperta" as const,
         priorita: input.priorita ?? "media",
         squadraId: null,
@@ -155,6 +190,10 @@ export const commesseRouter = router({
         updatedAt: now,
       };
       commesse.push(commessa);
+      // Link commessa back to cliente
+      if (inputClienteId) {
+        addCommessaToCliente(inputClienteId, id);
+      }
       return commessa;
     }),
 
@@ -167,7 +206,7 @@ export const commesseRouter = router({
         citta: z.string().optional(),
         telefono: z.string().optional(),
         email: z.string().optional(),
-        stato: z.enum(["aperta", "in_rilievo", "in_lavorazione", "in_posa", "chiusa", "archiviata"]).optional(),
+        stato: z.enum(["preventivo", "aperta", "in_rilievo", "in_lavorazione", "in_produzione", "in_posa", "chiusa", "archiviata"]).optional(),
         priorita: z.enum(["bassa", "media", "alta", "urgente"]).optional(),
         squadraId: z.number().nullable().optional(),
         note: z.string().optional(),
@@ -177,16 +216,30 @@ export const commesseRouter = router({
     .mutation(({ input }) => {
       const idx = commesse.findIndex((c) => c.id === input.id);
       if (idx === -1) throw new Error("Commessa non trovata");
+      // Enforce state machine on stato transitions
+      if (input.stato && input.stato !== commesse[idx].stato) {
+        validateTransizione(commesse[idx].stato, input.stato);
+      }
       const { id, ...updates } = input;
       commesse[idx] = { ...commesse[idx], ...updates, updatedAt: new Date() };
+      if (input.stato === "chiusa") {
+        commesse[idx].dataChiusura = new Date().toISOString().split("T")[0];
+      }
       return commesse[idx];
     }),
+
+  delete: publicProcedure.input(z.number()).mutation(({ input }) => {
+    const idx = commesse.findIndex((c) => c.id === input);
+    if (idx === -1) throw new Error("Commessa non trovata");
+    commesse.splice(idx, 1);
+    return { success: true };
+  }),
 
   stats: publicProcedure.query(() => {
     const total = commesse.length;
     const aperte = commesse.filter((c) => c.stato === "aperta").length;
     const inCorso = commesse.filter((c) =>
-      ["in_rilievo", "in_lavorazione", "in_posa"].includes(c.stato)
+      ["in_rilievo", "in_lavorazione", "in_produzione", "in_posa"].includes(c.stato)
     ).length;
     const chiuse = commesse.filter((c) => ["chiusa", "archiviata"].includes(c.stato)).length;
     const urgenti = commesse.filter(

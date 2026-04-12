@@ -81,4 +81,11 @@ export const apertureRouter = router({
       aperture[idx] = { ...aperture[idx], ...updates, updatedAt: new Date() };
       return aperture[idx];
     }),
+
+  delete: publicProcedure.input(z.number()).mutation(({ input }) => {
+    const idx = aperture.findIndex((a) => a.id === input);
+    if (idx === -1) throw new Error("Apertura non trovata");
+    aperture.splice(idx, 1);
+    return { success: true };
+  }),
 });

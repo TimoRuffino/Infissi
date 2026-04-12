@@ -11,6 +11,8 @@ import { squadreRouter } from "./routers/squadre";
 import { garanzieRouter } from "./routers/garanzie";
 import { verbaliRouter } from "./routers/verbali";
 import { clientiRouter } from "./routers/clienti";
+import { fornitoriRouter } from "./routers/fornitori";
+import { produzioneRouter } from "./routers/produzione";
 
 export const appRouter = router({
   system: systemRouter,
@@ -32,6 +34,8 @@ export const appRouter = router({
   garanzie: garanzieRouter,
   verbali: verbaliRouter,
   clienti: clientiRouter,
+  fornitori: fornitoriRouter,
+  produzione: produzioneRouter,
 });
 
 export type AppRouter = typeof appRouter;

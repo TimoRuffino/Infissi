@@ -117,6 +117,16 @@ let clienti: any[] = [
 
 let nextId = 6;
 
+// ── Exported store operations (used by commesse router) ─────────────────────
+
+export function addCommessaToCliente(clienteId: number, commessaId: number) {
+  const idx = clienti.findIndex((c) => c.id === clienteId);
+  if (idx === -1) return;
+  if (!clienti[idx].commesseIds.includes(commessaId)) {
+    clienti[idx].commesseIds = [...clienti[idx].commesseIds, commessaId];
+  }
+}
+
 export const clientiRouter = router({
   list: publicProcedure
     .input(
@@ -208,6 +218,13 @@ export const clientiRouter = router({
       clienti[idx] = { ...clienti[idx], ...updates, updatedAt: new Date() };
       return clienti[idx];
     }),
+
+  delete: publicProcedure.input(z.number()).mutation(({ input }) => {
+    const idx = clienti.findIndex((c) => c.id === input);
+    if (idx === -1) throw new Error("Cliente non trovato");
+    clienti.splice(idx, 1);
+    return { success: true };
+  }),
 
   stats: publicProcedure.query(() => {
     return {

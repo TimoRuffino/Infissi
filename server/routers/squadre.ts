@@ -48,4 +48,11 @@ export const squadreRouter = router({
       squadre[idx] = { ...squadre[idx], ...updates, updatedAt: new Date() };
       return squadre[idx];
     }),
+
+  delete: publicProcedure.input(z.number()).mutation(({ input }) => {
+    const idx = squadre.findIndex((s) => s.id === input);
+    if (idx === -1) throw new Error("Squadra non trovata");
+    squadre.splice(idx, 1);
+    return { success: true };
+  }),
 });

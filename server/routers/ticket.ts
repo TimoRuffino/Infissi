@@ -49,6 +49,29 @@ export const ticketRouter = router({
       return t;
     }),
 
+  update: publicProcedure
+    .input(z.object({
+      id: z.number(),
+      oggetto: z.string().optional(),
+      descrizione: z.string().optional(),
+      categoria: z.enum(["difetto_prodotto", "difetto_posa", "regolazione", "sostituzione", "garanzia", "altro"]).optional(),
+      priorita: z.enum(["bassa", "media", "alta", "urgente"]).optional(),
+    }))
+    .mutation(({ input }) => {
+      const idx = tickets.findIndex((t) => t.id === input.id);
+      if (idx === -1) throw new Error("Ticket non trovato");
+      const { id, ...updates } = input;
+      tickets[idx] = { ...tickets[idx], ...updates, updatedAt: new Date() };
+      return tickets[idx];
+    }),
+
+  delete: publicProcedure.input(z.number()).mutation(({ input }) => {
+    const idx = tickets.findIndex((t) => t.id === input);
+    if (idx === -1) throw new Error("Ticket non trovato");
+    tickets.splice(idx, 1);
+    return { success: true };
+  }),
+
   updateStato: publicProcedure
     .input(z.object({
       id: z.number(),
