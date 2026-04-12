@@ -32,6 +32,8 @@ import {
   Shield,
   Contact,
   Settings,
+  Truck,
+  Factory,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -44,6 +46,8 @@ const menuItems = [
   { icon: Contact, label: "Clienti", path: "/clienti" },
   { icon: Building2, label: "Commesse", path: "/commesse" },
   { icon: CalendarDays, label: "Pianificazione", path: "/planning" },
+  { icon: Truck, label: "Fornitori", path: "/fornitori" },
+  { icon: Factory, label: "Produzione", path: "/produzione" },
   { icon: Users, label: "Squadre", path: "/squadre" },
   { icon: TicketCheck, label: "Post-Vendita", path: "/ticket" },
   { icon: Shield, label: "Garanzie", path: "/garanzie" },

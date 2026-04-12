@@ -26,8 +26,13 @@ import {
   Clock,
   CheckCircle2,
   Calendar,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { useState } from "react";
+import ConfirmDialog from "@/components/ConfirmDialog";
+
+type DeleteTarget = { id: number; label: string } | null;
 
 function daysUntil(dateStr: string): number {
   const now = new Date();
@@ -55,6 +60,9 @@ const tipoLabels: Record<string, string> = {
 export default function GaranzieList() {
   const [filter, setFilter] = useState<string | undefined>(undefined);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editId, setEditId] = useState<number | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
 
   const garanzie = trpc.garanzie.list.useQuery(filter ? { tipo: filter } : {});
   const stats = trpc.garanzie.stats.useQuery();
@@ -78,6 +86,21 @@ export default function GaranzieList() {
     },
   });
 
+  const updateGaranzia = trpc.garanzie.update.useMutation({
+    onSuccess: () => {
+      utils.garanzie.invalidate();
+      setEditOpen(false);
+      setEditId(null);
+    },
+  });
+
+  const deleteGaranzia = trpc.garanzie.delete.useMutation({
+    onSuccess: () => {
+      utils.garanzie.invalidate();
+      setDeleteTarget(null);
+    },
+  });
+
   const [form, setForm] = useState({
     commessaId: "",
     tipo: "prodotto" as const,
@@ -88,6 +111,26 @@ export default function GaranzieList() {
     documentoRif: "",
     note: "",
   });
+
+  const [editForm, setEditForm] = useState({
+    tipo: "prodotto" as string,
+    descrizione: "",
+    fornitore: "",
+    documentoRif: "",
+    note: "",
+  });
+
+  function openEdit(g: any) {
+    setEditId(g.id);
+    setEditForm({
+      tipo: g.tipo,
+      descrizione: g.descrizione,
+      fornitore: g.fornitore ?? "",
+      documentoRif: g.documentoRif ?? "",
+      note: g.note ?? "",
+    });
+    setEditOpen(true);
+  }
 
   const s = stats.data;
 
@@ -354,11 +397,19 @@ export default function GaranzieList() {
                         </p>
                       )}
                     </div>
-                    <div
-                      className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ${status.color}`}
-                    >
-                      <StatusIcon className="h-3.5 w-3.5" />
-                      {status.label}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div
+                        className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${status.color}`}
+                      >
+                        <StatusIcon className="h-3.5 w-3.5" />
+                        {status.label}
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(g)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-red-600 hover:text-red-700" onClick={() => setDeleteTarget({ id: g.id, label: g.descrizione })}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
@@ -367,6 +418,70 @@ export default function GaranzieList() {
           })}
         </div>
       )}
+
+      {/* Edit dialog */}
+      <Dialog open={editOpen} onOpenChange={(o) => { setEditOpen(o); if (!o) setEditId(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Modifica garanzia</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Tipo</Label>
+                <Select value={editForm.tipo} onValueChange={(v) => setEditForm({ ...editForm, tipo: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="prodotto">Prodotto</SelectItem>
+                    <SelectItem value="posa">Posa in opera</SelectItem>
+                    <SelectItem value="accessorio">Accessorio</SelectItem>
+                    <SelectItem value="vetro">Vetro</SelectItem>
+                    <SelectItem value="altro">Altro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Fornitore</Label>
+                <Input value={editForm.fornitore} onChange={(e) => setEditForm({ ...editForm, fornitore: e.target.value })} />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Descrizione</Label>
+              <Input value={editForm.descrizione} onChange={(e) => setEditForm({ ...editForm, descrizione: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Riferimento documento</Label>
+              <Input value={editForm.documentoRif} onChange={(e) => setEditForm({ ...editForm, documentoRif: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Note</Label>
+              <Textarea rows={2} value={editForm.note} onChange={(e) => setEditForm({ ...editForm, note: e.target.value })} />
+            </div>
+            <Button
+              onClick={() => editId && updateGaranzia.mutate({
+                id: editId,
+                tipo: editForm.tipo as any,
+                descrizione: editForm.descrizione || undefined,
+                fornitore: editForm.fornitore || undefined,
+                documentoRif: editForm.documentoRif || undefined,
+                note: editForm.note || undefined,
+              })}
+              disabled={updateGaranzia.isPending}
+            >
+              Aggiorna
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirm */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+        title="Elimina garanzia"
+        description={`Eliminare "${deleteTarget?.label}"? Questa azione non puo essere annullata.`}
+        onConfirm={() => deleteTarget && deleteGaranzia.mutate(deleteTarget.id)}
+      />
     </div>
   );
 }

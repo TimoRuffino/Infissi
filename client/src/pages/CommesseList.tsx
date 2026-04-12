@@ -19,14 +19,19 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Search, MapPin, Calendar } from "lucide-react";
+import { Plus, Search, MapPin, Calendar, User, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
+import ConfirmDialog from "@/components/ConfirmDialog";
+
+type DeleteTarget = { id: number; label: string } | null;
 
 const statoColors: Record<string, string> = {
+  preventivo: "bg-slate-100 text-slate-700",
   aperta: "bg-blue-100 text-blue-800",
   in_rilievo: "bg-amber-100 text-amber-800",
   in_lavorazione: "bg-purple-100 text-purple-800",
+  in_produzione: "bg-indigo-100 text-indigo-800",
   in_posa: "bg-orange-100 text-orange-800",
   chiusa: "bg-green-100 text-green-800",
   archiviata: "bg-gray-100 text-gray-600",
@@ -44,22 +49,33 @@ export default function CommesseList() {
   const [search, setSearch] = useState("");
   const [filtroStato, setFiltroStato] = useState<string>("tutti");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
 
   const commesse = trpc.commesse.list.useQuery({
     search: search || undefined,
     stato: filtroStato !== "tutti" ? filtroStato : undefined,
   });
+  const clientiList = trpc.clienti.list.useQuery({});
 
   const utils = trpc.useUtils();
   const createMutation = trpc.commesse.create.useMutation({
     onSuccess: () => {
       utils.commesse.invalidate();
+      utils.clienti.invalidate();
       setDialogOpen(false);
+    },
+  });
+
+  const deleteCommessa = trpc.commesse.delete.useMutation({
+    onSuccess: () => {
+      utils.commesse.invalidate();
+      setDeleteTarget(null);
     },
   });
 
   const [form, setForm] = useState({
     codice: "",
+    clienteId: "" as string, // stored as string for select value
     cliente: "",
     indirizzo: "",
     citta: "",
@@ -70,14 +86,43 @@ export default function CommesseList() {
     dataConsegnaPrevista: "",
   });
 
+  function handleClienteSelect(clienteIdStr: string) {
+    if (clienteIdStr === "__new__") {
+      setForm({ ...form, clienteId: "", cliente: "", indirizzo: "", citta: "", telefono: "", email: "" });
+      return;
+    }
+    const id = parseInt(clienteIdStr, 10);
+    const c = clientiList.data?.find((x: any) => x.id === id);
+    if (c) {
+      setForm({
+        ...form,
+        clienteId: clienteIdStr,
+        cliente: c.ragioneSociale,
+        indirizzo: c.indirizzo ?? "",
+        citta: c.citta ?? "",
+        telefono: c.telefono ?? "",
+        email: c.email ?? "",
+      });
+    }
+  }
+
   function handleCreate() {
     if (!form.codice || !form.cliente) return;
     createMutation.mutate({
-      ...form,
+      codice: form.codice,
+      clienteId: form.clienteId ? parseInt(form.clienteId, 10) : undefined,
+      cliente: form.cliente,
+      indirizzo: form.indirizzo || undefined,
+      citta: form.citta || undefined,
+      telefono: form.telefono || undefined,
+      email: form.email || undefined,
+      priorita: form.priorita,
+      note: form.note || undefined,
       dataConsegnaPrevista: form.dataConsegnaPrevista || undefined,
     });
     setForm({
       codice: "",
+      clienteId: "",
       cliente: "",
       indirizzo: "",
       citta: "",
@@ -143,13 +188,38 @@ export default function CommesseList() {
               </div>
               <div className="space-y-2">
                 <Label>Cliente *</Label>
-                <Input
-                  placeholder="Nome cliente"
-                  value={form.cliente}
-                  onChange={(e) =>
-                    setForm({ ...form, cliente: e.target.value })
-                  }
-                />
+                <Select
+                  value={form.clienteId || "__new__"}
+                  onValueChange={handleClienteSelect}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleziona cliente..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__new__">
+                      <span className="flex items-center gap-2 text-muted-foreground">
+                        <User className="h-3.5 w-3.5" />
+                        Cliente non registrato
+                      </span>
+                    </SelectItem>
+                    {clientiList.data?.map((c: any) => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.ragioneSociale}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {form.clienteId === "" && (
+                  <Input
+                    placeholder="Nome cliente *"
+                    value={form.cliente}
+                    onChange={(e) => setForm({ ...form, cliente: e.target.value })}
+                    className="mt-1.5"
+                  />
+                )}
+                {form.clienteId !== "" && (
+                  <p className="text-xs text-muted-foreground mt-1">{form.cliente}</p>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
@@ -234,9 +304,11 @@ export default function CommesseList() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="tutti">Tutti gli stati</SelectItem>
+            <SelectItem value="preventivo">Preventivo</SelectItem>
             <SelectItem value="aperta">Aperta</SelectItem>
             <SelectItem value="in_rilievo">In rilievo</SelectItem>
             <SelectItem value="in_lavorazione">In lavorazione</SelectItem>
+            <SelectItem value="in_produzione">In produzione</SelectItem>
             <SelectItem value="in_posa">In posa</SelectItem>
             <SelectItem value="chiusa">Chiusa</SelectItem>
             <SelectItem value="archiviata">Archiviata</SelectItem>
@@ -289,6 +361,14 @@ export default function CommesseList() {
                     )}
                   </div>
                 </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-red-600 hover:text-red-700 shrink-0"
+                  onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: c.id, label: `${c.codice} — ${c.cliente}` }); }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -300,6 +380,14 @@ export default function CommesseList() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+        title="Elimina commessa"
+        description={`Eliminare "${deleteTarget?.label}"? Questa azione non puo essere annullata.`}
+        onConfirm={() => deleteTarget && deleteCommessa.mutate(deleteTarget.id)}
+      />
     </div>
   );
 }

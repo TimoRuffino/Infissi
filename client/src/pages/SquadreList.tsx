@@ -12,12 +12,16 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Users, Plus, Phone, UserCircle, Pencil } from "lucide-react";
+import { Users, Plus, Phone, UserCircle, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
+import ConfirmDialog from "@/components/ConfirmDialog";
+
+type DeleteTarget = { id: number; label: string } | null;
 
 export default function SquadreList() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
 
   const squadre = trpc.squadre.list.useQuery();
   const interventi = trpc.interventi.list.useQuery({});
@@ -37,6 +41,13 @@ export default function SquadreList() {
       setDialogOpen(false);
       setEditId(null);
       resetForm();
+    },
+  });
+
+  const deleteSquadra = trpc.squadre.delete.useMutation({
+    onSuccess: () => {
+      utils.squadre.invalidate();
+      setDeleteTarget(null);
     },
   });
 
@@ -200,14 +211,14 @@ export default function SquadreList() {
                         </p>
                       )}
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => openEdit(s)}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(s)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:text-red-700" onClick={() => setDeleteTarget({ id: s.id, label: s.nome })}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
 
                   {s.telefono && (
@@ -237,6 +248,14 @@ export default function SquadreList() {
           })}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+        title="Elimina squadra"
+        description={`Eliminare "${deleteTarget?.label}"? Questa azione non puo essere annullata.`}
+        onConfirm={() => deleteTarget && deleteSquadra.mutate(deleteTarget.id)}
+      />
     </div>
   );
 }

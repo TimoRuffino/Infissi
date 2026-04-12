@@ -5,6 +5,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   ArrowLeft,
   MapPin,
   Phone,
@@ -18,8 +35,12 @@ import {
   TicketCheck,
   Shield,
   FileText,
+  Pencil,
+  Trash2,
 } from "lucide-react";
+import { useState } from "react";
 import { useLocation, useParams } from "wouter";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 const tipoIcons: Record<string, any> = {
   privato: User,
@@ -46,6 +67,18 @@ export default function ClienteDetail() {
   const interventi = trpc.interventi.list.useQuery({});
   const ticketList = trpc.ticket.list.useQuery({});
   const garanzieList = trpc.garanzie.list.useQuery({});
+
+  const utils = trpc.useUtils();
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editForm, setEditForm] = useState<any>(null);
+
+  const updateCliente = trpc.clienti.update.useMutation({
+    onSuccess: () => { utils.clienti.byId.invalidate(clienteId); setEditOpen(false); },
+  });
+  const deleteCliente = trpc.clienti.delete.useMutation({
+    onSuccess: () => { setDeleteOpen(false); setLocation("/clienti"); },
+  });
 
   const c = cliente.data;
 
@@ -132,6 +165,27 @@ export default function ClienteDetail() {
                 {c.partitaIva && ` — P.IVA: ${c.partitaIva}`}
               </p>
             )}
+          </div>
+          <div className="flex gap-1.5 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setEditForm({
+                  ragioneSociale: c.ragioneSociale, tipo: c.tipo,
+                  indirizzo: c.indirizzo ?? "", citta: c.citta ?? "", cap: c.cap ?? "",
+                  telefono: c.telefono ?? "", email: c.email ?? "",
+                  codiceFiscale: c.codiceFiscale ?? "", partitaIva: c.partitaIva ?? "",
+                  note: c.note ?? "",
+                });
+                setEditOpen(true);
+              }}
+            >
+              <Pencil className="h-3.5 w-3.5 mr-1" /> Modifica
+            </Button>
+            <Button variant="outline" size="sm" className="text-red-600 hover:bg-red-50" onClick={() => setDeleteOpen(true)}>
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
           </div>
         </div>
 
@@ -390,6 +444,101 @@ export default function ClienteDetail() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Edit dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Modifica cliente</DialogTitle>
+          </DialogHeader>
+          {editForm && (
+            <div className="grid gap-3 py-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Ragione sociale</Label>
+                  <Input value={editForm.ragioneSociale} onChange={(e) => setEditForm({ ...editForm, ragioneSociale: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Tipo</Label>
+                  <Select value={editForm.tipo} onValueChange={(v) => setEditForm({ ...editForm, tipo: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="privato">Privato</SelectItem>
+                      <SelectItem value="azienda">Azienda</SelectItem>
+                      <SelectItem value="condominio">Condominio</SelectItem>
+                      <SelectItem value="ente_pubblico">Ente pubblico</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1.5 col-span-2">
+                  <Label>Indirizzo</Label>
+                  <Input value={editForm.indirizzo} onChange={(e) => setEditForm({ ...editForm, indirizzo: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>CAP</Label>
+                  <Input value={editForm.cap} onChange={(e) => setEditForm({ ...editForm, cap: e.target.value })} />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Citta</Label>
+                  <Input value={editForm.citta} onChange={(e) => setEditForm({ ...editForm, citta: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Telefono</Label>
+                  <Input value={editForm.telefono} onChange={(e) => setEditForm({ ...editForm, telefono: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Email</Label>
+                  <Input value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Codice Fiscale</Label>
+                  <Input value={editForm.codiceFiscale} onChange={(e) => setEditForm({ ...editForm, codiceFiscale: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Partita IVA</Label>
+                  <Input value={editForm.partitaIva} onChange={(e) => setEditForm({ ...editForm, partitaIva: e.target.value })} />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Note</Label>
+                <Textarea rows={2} value={editForm.note} onChange={(e) => setEditForm({ ...editForm, note: e.target.value })} />
+              </div>
+              <Button
+                onClick={() => updateCliente.mutate({
+                  id: clienteId,
+                  ragioneSociale: editForm.ragioneSociale,
+                  tipo: editForm.tipo as any,
+                  indirizzo: editForm.indirizzo || undefined,
+                  citta: editForm.citta || undefined,
+                  cap: editForm.cap || undefined,
+                  telefono: editForm.telefono || undefined,
+                  email: editForm.email || undefined,
+                  codiceFiscale: editForm.codiceFiscale || undefined,
+                  partitaIva: editForm.partitaIva || undefined,
+                  note: editForm.note || undefined,
+                })}
+                disabled={updateCliente.isPending}
+              >
+                Salva modifiche
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Eliminare cliente?"
+        description={`Stai per eliminare "${c.ragioneSociale}". Questa azione non puo essere annullata.`}
+        onConfirm={() => deleteCliente.mutate(clienteId)}
+      />
     </div>
   );
 }

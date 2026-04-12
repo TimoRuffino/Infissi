@@ -19,8 +19,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Clock, AlertCircle } from "lucide-react";
+import { Plus, Clock, AlertCircle, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
+import ConfirmDialog from "@/components/ConfirmDialog";
+
+type DeleteTarget = { id: number; label: string } | null;
 
 const statoTicketColors: Record<string, string> = {
   aperto: "bg-red-100 text-red-800",
@@ -33,6 +36,9 @@ const statoTicketColors: Record<string, string> = {
 export default function TicketList() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [filtroStato, setFiltroStato] = useState("tutti");
+  const [editOpen, setEditOpen] = useState(false);
+  const [editId, setEditId] = useState<number | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
 
   const tickets = trpc.ticket.list.useQuery(
     filtroStato !== "tutti" ? { stato: filtroStato } : {}
@@ -47,6 +53,25 @@ export default function TicketList() {
     },
   });
 
+  const updateTicket = trpc.ticket.update.useMutation({
+    onSuccess: () => {
+      utils.ticket.invalidate();
+      setEditOpen(false);
+      setEditId(null);
+    },
+  });
+
+  const updateStato = trpc.ticket.updateStato.useMutation({
+    onSuccess: () => utils.ticket.invalidate(),
+  });
+
+  const deleteTicket = trpc.ticket.delete.useMutation({
+    onSuccess: () => {
+      utils.ticket.invalidate();
+      setDeleteTarget(null);
+    },
+  });
+
   const [form, setForm] = useState({
     commessaId: "",
     oggetto: "",
@@ -54,6 +79,24 @@ export default function TicketList() {
     categoria: "regolazione" as const,
     priorita: "media" as const,
   });
+
+  const [editForm, setEditForm] = useState({
+    oggetto: "",
+    descrizione: "",
+    categoria: "regolazione" as string,
+    priorita: "media" as string,
+  });
+
+  function openEdit(t: any) {
+    setEditId(t.id);
+    setEditForm({
+      oggetto: t.oggetto,
+      descrizione: t.descrizione ?? "",
+      categoria: t.categoria,
+      priorita: t.priorita,
+    });
+    setEditOpen(true);
+  }
 
   function handleCreate() {
     if (!form.commessaId || !form.oggetto) return;
@@ -259,6 +302,34 @@ export default function TicketList() {
                       </p>
                     )}
                   </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {t.stato === "aperto" && (
+                      <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => updateStato.mutate({ id: t.id, stato: "assegnato" })}>
+                        Assegna
+                      </Button>
+                    )}
+                    {t.stato === "assegnato" && (
+                      <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => updateStato.mutate({ id: t.id, stato: "in_lavorazione" })}>
+                        Lavora
+                      </Button>
+                    )}
+                    {t.stato === "in_lavorazione" && (
+                      <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => updateStato.mutate({ id: t.id, stato: "risolto" })}>
+                        Risolvi
+                      </Button>
+                    )}
+                    {t.stato === "risolto" && (
+                      <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => updateStato.mutate({ id: t.id, stato: "chiuso" })}>
+                        Chiudi
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(t)}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-red-600 hover:text-red-700" onClick={() => setDeleteTarget({ id: t.id, label: t.oggetto })}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -272,6 +343,74 @@ export default function TicketList() {
           </div>
         )}
       </div>
+
+      {/* Edit dialog */}
+      <Dialog open={editOpen} onOpenChange={(o) => { setEditOpen(o); if (!o) setEditId(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Modifica ticket</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 py-2">
+            <div className="space-y-1.5">
+              <Label>Oggetto</Label>
+              <Input value={editForm.oggetto} onChange={(e) => setEditForm({ ...editForm, oggetto: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Categoria</Label>
+                <Select value={editForm.categoria} onValueChange={(v) => setEditForm({ ...editForm, categoria: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="difetto_prodotto">Difetto prodotto</SelectItem>
+                    <SelectItem value="difetto_posa">Difetto posa</SelectItem>
+                    <SelectItem value="regolazione">Regolazione</SelectItem>
+                    <SelectItem value="sostituzione">Sostituzione</SelectItem>
+                    <SelectItem value="garanzia">Garanzia</SelectItem>
+                    <SelectItem value="altro">Altro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Priorita</Label>
+                <Select value={editForm.priorita} onValueChange={(v) => setEditForm({ ...editForm, priorita: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="bassa">Bassa</SelectItem>
+                    <SelectItem value="media">Media</SelectItem>
+                    <SelectItem value="alta">Alta</SelectItem>
+                    <SelectItem value="urgente">Urgente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Descrizione</Label>
+              <Textarea rows={3} value={editForm.descrizione} onChange={(e) => setEditForm({ ...editForm, descrizione: e.target.value })} />
+            </div>
+            <Button
+              onClick={() => editId && updateTicket.mutate({
+                id: editId,
+                oggetto: editForm.oggetto || undefined,
+                descrizione: editForm.descrizione || undefined,
+                categoria: editForm.categoria as any,
+                priorita: editForm.priorita as any,
+              })}
+              disabled={updateTicket.isPending}
+            >
+              Aggiorna
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirm */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+        title="Elimina ticket"
+        description={`Eliminare "${deleteTarget?.label}"? Questa azione non puo essere annullata.`}
+        onConfirm={() => deleteTarget && deleteTicket.mutate(deleteTarget.id)}
+      />
     </div>
   );
 }

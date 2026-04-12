@@ -32,9 +32,14 @@ import {
   ClipboardCheck,
   Hammer,
   FileText,
+  Contact,
+  Trash2,
+  ChevronRight,
+  Pencil,
 } from "lucide-react";
 import { useState } from "react";
 import { useLocation, useParams } from "wouter";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 const statoAperturaColors: Record<string, string> = {
   da_rilevare: "bg-gray-100 text-gray-700",
@@ -56,7 +61,39 @@ export default function CommessaDetail() {
   const interventi = trpc.interventi.list.useQuery({ commessaId });
   const anomalie = trpc.anomalie.list.useQuery({ commessaId });
 
+  const squadre = trpc.squadre.list.useQuery();
+
   const utils = trpc.useUtils();
+  const [deleteTarget, setDeleteTarget] = useState<{ type: string; id: number; label: string } | null>(null);
+  const [interventoDialog, setInterventoDialog] = useState(false);
+  const [interventoForm, setInterventoForm] = useState({
+    tipo: "posa" as string,
+    dataPianificata: "",
+    squadraId: "" as string,
+    indirizzo: "",
+    note: "",
+  });
+
+  const deleteApertura = trpc.aperture.delete.useMutation({
+    onSuccess: () => { utils.aperture.byCommessa.invalidate(commessaId); setDeleteTarget(null); },
+  });
+  const deleteIntervento = trpc.interventi.delete.useMutation({
+    onSuccess: () => { utils.interventi.list.invalidate(); setDeleteTarget(null); },
+  });
+  const createIntervento = trpc.interventi.create.useMutation({
+    onSuccess: () => {
+      utils.interventi.list.invalidate();
+      setInterventoDialog(false);
+      setInterventoForm({ tipo: "posa", dataPianificata: "", squadraId: "", indirizzo: "", note: "" });
+    },
+  });
+  const updateCommessa = trpc.commesse.update.useMutation({
+    onSuccess: () => utils.commesse.byId.invalidate(commessaId),
+  });
+  const deleteCommessa = trpc.commesse.delete.useMutation({
+    onSuccess: () => { setDeleteTarget(null); setLocation("/commesse"); },
+  });
+
   const [aperturaDialog, setAperturaDialog] = useState(false);
   const [aperturaForm, setAperturaForm] = useState({
     codice: "",
@@ -132,6 +169,43 @@ export default function CommessaDetail() {
               )}
             </div>
             <h1 className="text-2xl font-bold tracking-tight">{c.cliente}</h1>
+          </div>
+          <div className="flex gap-1.5 shrink-0">
+            {c.clienteId && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setLocation(`/clienti/${c.clienteId}`)}
+              >
+                <Contact className="h-3.5 w-3.5 mr-1" />
+                Scheda cliente
+              </Button>
+            )}
+            {c.stato !== "archiviata" && (() => {
+              const next: Record<string, string> = {
+                preventivo: "aperta", aperta: "in_rilievo", in_rilievo: "in_lavorazione",
+                in_lavorazione: "in_produzione", in_produzione: "in_posa", in_posa: "chiusa", chiusa: "archiviata",
+              };
+              const nextStato = next[c.stato];
+              return nextStato ? (
+                <Button
+                  size="sm"
+                  onClick={() => updateCommessa.mutate({ id: commessaId, stato: nextStato as any })}
+                  disabled={updateCommessa.isPending}
+                >
+                  <ChevronRight className="h-3.5 w-3.5 mr-1" />
+                  {nextStato.replace(/_/g, " ")}
+                </Button>
+              ) : null;
+            })()}
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-red-600 hover:bg-red-50"
+              onClick={() => setDeleteTarget({ type: "commessa", id: commessaId, label: c.codice })}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
           </div>
         </div>
 
@@ -448,19 +522,29 @@ export default function CommessaDetail() {
                           </p>
                         )}
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="shrink-0 text-xs"
-                        onClick={() =>
-                          setLocation(
-                            `/commesse/${commessaId}/aperture/${a.id}/rilievo`
-                          )
-                        }
-                      >
-                        <ClipboardCheck className="h-3.5 w-3.5 mr-1" />
-                        Rilievo
-                      </Button>
+                      <div className="flex gap-1 shrink-0">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs"
+                          onClick={() =>
+                            setLocation(
+                              `/commesse/${commessaId}/aperture/${a.id}/rilievo`
+                            )
+                          }
+                        >
+                          <ClipboardCheck className="h-3.5 w-3.5 mr-1" />
+                          Rilievo
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50 px-2"
+                          onClick={() => setDeleteTarget({ type: "apertura", id: a.id, label: a.codice })}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -471,6 +555,75 @@ export default function CommessaDetail() {
 
         {/* Interventi Tab */}
         <TabsContent value="interventi" className="space-y-4 mt-4">
+          <div className="flex justify-end">
+            <Dialog open={interventoDialog} onOpenChange={setInterventoDialog}>
+              <DialogTrigger asChild>
+                <Button size="sm">
+                  <Plus className="h-4 w-4 mr-1" /> Nuovo intervento
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Nuovo intervento</DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-3 py-2">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label>Tipo *</Label>
+                      <Select value={interventoForm.tipo} onValueChange={(v) => setInterventoForm({ ...interventoForm, tipo: v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="rilievo">Rilievo</SelectItem>
+                          <SelectItem value="posa">Posa</SelectItem>
+                          <SelectItem value="assistenza">Assistenza</SelectItem>
+                          <SelectItem value="sopralluogo">Sopralluogo</SelectItem>
+                          <SelectItem value="altro">Altro</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Data pianificata</Label>
+                      <Input type="date" value={interventoForm.dataPianificata} onChange={(e) => setInterventoForm({ ...interventoForm, dataPianificata: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Squadra</Label>
+                    <Select value={interventoForm.squadraId} onValueChange={(v) => setInterventoForm({ ...interventoForm, squadraId: v })}>
+                      <SelectTrigger><SelectValue placeholder="Nessuna" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Nessuna</SelectItem>
+                        {squadre.data?.map((s: any) => (
+                          <SelectItem key={s.id} value={String(s.id)}>{s.nome}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Indirizzo</Label>
+                    <Input value={interventoForm.indirizzo} onChange={(e) => setInterventoForm({ ...interventoForm, indirizzo: e.target.value })} placeholder={c.indirizzo ? `${c.indirizzo}, ${c.citta}` : ""} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Note</Label>
+                    <Textarea rows={2} value={interventoForm.note} onChange={(e) => setInterventoForm({ ...interventoForm, note: e.target.value })} />
+                  </div>
+                  <Button
+                    onClick={() => createIntervento.mutate({
+                      commessaId,
+                      tipo: interventoForm.tipo as any,
+                      dataPianificata: interventoForm.dataPianificata || undefined,
+                      squadraId: interventoForm.squadraId && interventoForm.squadraId !== "__none__" ? parseInt(interventoForm.squadraId) : null,
+                      indirizzo: interventoForm.indirizzo || c.indirizzo ? `${c.indirizzo}, ${c.citta}` : undefined,
+                      note: interventoForm.note || undefined,
+                    })}
+                    disabled={createIntervento.isPending}
+                  >
+                    Crea intervento
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+
           {interventi.data?.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground text-sm">
               Nessun intervento pianificato per questa commessa.
@@ -519,27 +672,22 @@ export default function CommessaDetail() {
                       </div>
                       <div className="flex gap-1.5 shrink-0">
                         {(i.tipo === "posa" || i.tipo === "assistenza") && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-xs"
-                            onClick={() => setLocation(`/posa/${i.id}`)}
-                          >
-                            <Hammer className="h-3.5 w-3.5 mr-1" />
-                            Posa
+                          <Button variant="outline" size="sm" className="text-xs" onClick={() => setLocation(`/posa/${i.id}`)}>
+                            <Hammer className="h-3.5 w-3.5 mr-1" /> Posa
                           </Button>
                         )}
                         {(i.stato === "in_corso" || i.stato === "completato") && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-xs"
-                            onClick={() => setLocation(`/verbale/${i.id}`)}
-                          >
-                            <FileText className="h-3.5 w-3.5 mr-1" />
-                            Verbale
+                          <Button variant="outline" size="sm" className="text-xs" onClick={() => setLocation(`/verbale/${i.id}`)}>
+                            <FileText className="h-3.5 w-3.5 mr-1" /> Verbale
                           </Button>
                         )}
+                        <Button
+                          variant="ghost" size="sm"
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50 px-2"
+                          onClick={() => setDeleteTarget({ type: "intervento", id: i.id, label: `${i.tipo} ${i.dataPianificata ?? ""}` })}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
                       </div>
                     </div>
                   </CardContent>
@@ -609,6 +757,20 @@ export default function CommessaDetail() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Delete confirmation */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title={`Eliminare ${deleteTarget?.type ?? ""}?`}
+        description={`Stai per eliminare "${deleteTarget?.label}". Questa azione non puo essere annullata.`}
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          if (deleteTarget.type === "apertura") deleteApertura.mutate(deleteTarget.id);
+          else if (deleteTarget.type === "intervento") deleteIntervento.mutate(deleteTarget.id);
+          else if (deleteTarget.type === "commessa") deleteCommessa.mutate(deleteTarget.id);
+        }}
+      />
     </div>
   );
 }

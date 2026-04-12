@@ -18,6 +18,8 @@ import SquadreList from "./pages/SquadreList";
 import ClientiList from "./pages/ClientiList";
 import ClienteDetail from "./pages/ClienteDetail";
 import Integrazioni from "./pages/Integrazioni";
+import FornitoriList from "./pages/FornitoriList";
+import Produzione from "./pages/Produzione";
 
 function Router() {
   return (
@@ -35,6 +37,8 @@ function Router() {
         <Route path="/ticket" component={TicketList} />
         <Route path="/garanzie" component={GaranzieList} />
         <Route path="/squadre" component={SquadreList} />
+        <Route path="/fornitori" component={FornitoriList} />
+        <Route path="/produzione" component={Produzione} />
         <Route path="/integrazioni" component={Integrazioni} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
