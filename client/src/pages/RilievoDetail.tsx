@@ -426,7 +426,7 @@ export default function RilievoDetail() {
                     <Label className="text-xs flex items-center gap-1">
                       {field.label}
                       {field.required && (
-                        <span className="text-[oklch(0.577_0.245_27.325)]">*</span>
+                        <span className="text-destructive">*</span>
                       )}
                       {field.unit !== "si/no" && field.unit !== "testo" && (
                         <span className="text-muted-foreground font-normal">

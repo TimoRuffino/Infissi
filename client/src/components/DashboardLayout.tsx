@@ -1,9 +1,11 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -19,7 +21,6 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import {
   LayoutDashboard,
@@ -34,24 +35,30 @@ import {
   Settings,
   Truck,
   Factory,
+  Kanban,
+  AlertTriangle,
+  User,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
-import { Button } from "./ui/button";
 import NotificheDropdown from "./NotificheDropdown";
+import LoginPage from "@/pages/LoginPage";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
   { icon: Contact, label: "Clienti", path: "/clienti" },
   { icon: Building2, label: "Commesse", path: "/commesse" },
-  { icon: CalendarDays, label: "Pianificazione", path: "/planning" },
-  { icon: Truck, label: "Fornitori", path: "/fornitori" },
-  { icon: Factory, label: "Produzione", path: "/produzione" },
-  { icon: Users, label: "Squadre", path: "/squadre" },
+  { icon: Kanban, label: "Board", path: "/kanban" },
+  { icon: CalendarDays, label: "Calendario", path: "/planning" },
+  { icon: AlertTriangle, label: "Reclami", path: "/reclami" },
   { icon: TicketCheck, label: "Post-Vendita", path: "/ticket" },
+  { icon: Truck, label: "Fornitori", path: "/fornitori" },
+  { icon: Users, label: "Utenti", path: "/utenti" },
   { icon: Shield, label: "Garanzie", path: "/garanzie" },
-  { icon: Settings, label: "Integrazioni", path: "/integrazioni" },
+  { icon: Users, label: "Squadre", path: "/squadre" },
+  { icon: Factory, label: "Produzione", path: "/produzione" },
+  { icon: Settings, label: "Impostazioni", path: "/integrazioni", badge: "Soon" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -69,40 +76,17 @@ export default function DashboardLayout({
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
   });
   const { loading, user } = useAuth();
-  const oauthConfigured = Boolean(import.meta.env.VITE_OAUTH_PORTAL_URL);
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
   }, [sidebarWidth]);
 
-  if (loading && oauthConfigured) {
+  if (loading) {
     return <DashboardLayoutSkeleton />
   }
 
-  if (!user && oauthConfigured) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
-          <div className="flex flex-col items-center gap-6">
-            <h1 className="text-2xl font-semibold tracking-tight text-center">
-              Accedi per continuare
-            </h1>
-            <p className="text-sm text-muted-foreground text-center max-w-sm">
-              L'accesso a questa dashboard richiede l'autenticazione.
-            </p>
-          </div>
-          <Button
-            onClick={() => {
-              window.location.href = getLoginUrl();
-            }}
-            size="lg"
-            className="w-full shadow-lg hover:shadow-xl transition-all"
-          >
-            Accedi
-          </Button>
-        </div>
-      </div>
-    );
+  if (!user) {
+    return <LoginPage />;
   }
 
   return (
@@ -195,9 +179,11 @@ function DashboardLayoutContent({
               </button>
               {!isCollapsed ? (
                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <span className="font-semibold tracking-tight truncate">
-                    Infissi Ops
-                  </span>
+                  <img
+                    src="/logo.svg"
+                    alt="Ruffino Group"
+                    className="h-7 brightness-0 invert"
+                  />
                   <div className="ml-auto">
                     <NotificheDropdown />
                   </div>
@@ -221,7 +207,12 @@ function DashboardLayoutContent({
                       <item.icon
                         className={`h-4 w-4 ${isActive ? "text-primary" : ""}`}
                       />
-                      <span>{item.label}</span>
+                      <span className="flex-1">{item.label}</span>
+                      {item.badge && (
+                        <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 font-medium opacity-60">
+                          {item.badge}
+                        </Badge>
+                      )}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
@@ -233,28 +224,33 @@ function DashboardLayoutContent({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-3 rounded-lg px-1 py-1 hover:bg-accent/50 transition-colors w-full text-left group-data-[collapsible=icon]:justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                  <Avatar className="h-9 w-9 border shrink-0">
-                    <AvatarFallback className="text-xs font-medium">
-                      {user?.name?.charAt(0).toUpperCase()}
+                  <Avatar className="h-9 w-9 border shrink-0 bg-primary/10">
+                    <AvatarFallback className="text-xs font-semibold text-primary bg-primary/10">
+                      {user?.name?.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
                     <p className="text-sm font-medium truncate leading-none">
                       {user?.name || "-"}
                     </p>
-                    <p className="text-xs text-muted-foreground truncate mt-1.5">
-                      {user?.email || "-"}
+                    <p className="text-xs text-muted-foreground truncate mt-1">
+                      {(user as any)?.ruolo?.replace(/_/g, " ") || user?.role || "-"}
                     </p>
                   </div>
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuContent align="end" className="w-56">
+                <div className="px-3 py-2">
+                  <p className="text-sm font-medium">{user?.name}</p>
+                  <p className="text-xs text-muted-foreground">{user?.email}</p>
+                </div>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={logout}
                   className="cursor-pointer text-destructive focus:text-destructive"
                 >
                   <LogOut className="mr-2 h-4 w-4" />
-                  <span>Sign out</span>
+                  <span>Esci</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

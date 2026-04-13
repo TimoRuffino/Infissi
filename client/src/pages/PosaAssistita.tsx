@@ -182,6 +182,7 @@ export default function PosaAssistita() {
             {i.stato === "pianificato" && (
               <Button
                 size="sm"
+                disabled={updateStato.isPending}
                 onClick={() =>
                   updateStato.mutate({ id: interventoId, stato: "in_corso" })
                 }
@@ -197,7 +198,7 @@ export default function PosaAssistita() {
                 onClick={() =>
                   updateStato.mutate({ id: interventoId, stato: "completato" })
                 }
-                disabled={progress < 100}
+                disabled={progress < 100 || updateStato.isPending}
               >
                 <Square className="h-4 w-4 mr-1" />
                 Completa
@@ -319,7 +320,7 @@ export default function PosaAssistita() {
       <Separator />
       <Dialog open={anomaliaDialog} onOpenChange={setAnomaliaDialog}>
         <DialogTrigger asChild>
-          <Button variant="outline" className="w-full border-dashed border-[oklch(0.577_0.245_27.325)] text-[oklch(0.577_0.245_27.325)]">
+          <Button variant="outline" className="w-full border-dashed border-destructive text-destructive">
             <AlertTriangle className="h-4 w-4 mr-2" />
             Segnala anomalia
           </Button>

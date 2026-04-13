@@ -35,25 +35,32 @@ import {
   Euro,
   Pencil,
   Trash2,
+  FileText,
 } from "lucide-react";
 import { useState } from "react";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
-type DeleteTarget = { type: "fornitore" | "ordine"; id: number; label: string } | null;
+type DeleteTarget = { type: "fornitore" | "ordine" | "listino"; id: number; label: string } | null;
 
 const categoriaLabels: Record<string, string> = {
-  profili: "Profili",
-  vetri: "Vetri",
+  pvc: "PVC",
+  alluminio: "Alluminio",
+  vetro: "Vetro",
   ferramenta: "Ferramenta",
+  persiane: "Persiane",
+  blindati: "Blindati",
   accessori: "Accessori",
   guarnizioni: "Guarnizioni",
   altro: "Altro",
 };
 
 const categoriaColors: Record<string, string> = {
-  profili: "bg-blue-100 text-blue-800",
-  vetri: "bg-cyan-100 text-cyan-800",
+  pvc: "bg-blue-100 text-blue-800",
+  alluminio: "bg-sky-100 text-sky-800",
+  vetro: "bg-cyan-100 text-cyan-800",
   ferramenta: "bg-amber-100 text-amber-800",
+  persiane: "bg-lime-100 text-lime-800",
+  blindati: "bg-stone-100 text-stone-800",
   accessori: "bg-purple-100 text-purple-800",
   guarnizioni: "bg-green-100 text-green-800",
   altro: "bg-gray-100 text-gray-600",
@@ -75,6 +82,8 @@ export default function FornitoriList() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [ordineDialogOpen, setOrdineDialogOpen] = useState(false);
   const [ordineFilter, setOrdineFilter] = useState<string | undefined>(undefined);
+  const [listinoDialogOpen, setListinoDialogOpen] = useState(false);
+  const [listinoForm, setListinoForm] = useState({ fornitoreId: "", nome: "", versione: "", dataValidita: "", nomeFile: "", tipo: "pdf" as string, note: "" });
   const [editOpen, setEditOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
@@ -91,12 +100,28 @@ export default function FornitoriList() {
   const utils = trpc.useUtils();
 
   const commesse = trpc.commesse.list.useQuery({});
+  const listiniQuery = trpc.fornitori.listini.list.useQuery({});
+
+  const createListino = trpc.fornitori.listini.create.useMutation({
+    onSuccess: () => {
+      utils.fornitori.listini.invalidate();
+      setListinoDialogOpen(false);
+      setListinoForm({ fornitoreId: "", nome: "", versione: "", dataValidita: "", nomeFile: "", tipo: "pdf", note: "" });
+    },
+  });
+
+  const deleteListino = trpc.fornitori.listini.delete.useMutation({
+    onSuccess: () => {
+      utils.fornitori.listini.invalidate();
+      setDeleteTarget(null);
+    },
+  });
 
   const createFornitore = trpc.fornitori.create.useMutation({
     onSuccess: () => {
       utils.fornitori.invalidate();
       setDialogOpen(false);
-      setForm({ ragioneSociale: "", partitaIva: "", indirizzo: "", citta: "", telefono: "", email: "", categoria: "profili", note: "" });
+      setForm({ ragioneSociale: "", partitaIva: "", indirizzo: "", citta: "", telefono: "", email: "", categoria: "alluminio", referenteCommerciale: "", scontistica: "", note: "" });
     },
   });
 
@@ -139,7 +164,9 @@ export default function FornitoriList() {
     citta: "",
     telefono: "",
     email: "",
-    categoria: "profili" as string,
+    categoria: "alluminio" as string,
+    referenteCommerciale: "",
+    scontistica: "",
     note: "",
   });
 
@@ -150,7 +177,9 @@ export default function FornitoriList() {
     citta: "",
     telefono: "",
     email: "",
-    categoria: "profili" as string,
+    categoria: "alluminio" as string,
+    referenteCommerciale: "",
+    scontistica: "",
     note: "",
   });
 
@@ -174,6 +203,8 @@ export default function FornitoriList() {
       telefono: f.telefono ?? "",
       email: f.email ?? "",
       categoria: f.categoria,
+      referenteCommerciale: f.referenteCommerciale ?? "",
+      scontistica: f.scontistica?.toString() ?? "",
       note: f.note ?? "",
     });
     setEditOpen(true);
@@ -279,6 +310,16 @@ export default function FornitoriList() {
                   <Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Referente commerciale</Label>
+                  <Input value={form.referenteCommerciale} onChange={(e) => setForm({ ...form, referenteCommerciale: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Sconto %</Label>
+                  <Input type="number" step="0.5" value={form.scontistica} onChange={(e) => setForm({ ...form, scontistica: e.target.value })} placeholder="es. 15" />
+                </div>
+              </div>
               <div className="space-y-1.5">
                 <Label>Note</Label>
                 <Textarea rows={2} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
@@ -293,6 +334,8 @@ export default function FornitoriList() {
                     telefono: form.telefono || undefined,
                     email: form.email || undefined,
                     categoria: form.categoria as any,
+                    referenteCommerciale: form.referenteCommerciale || undefined,
+                    scontistica: form.scontistica ? parseFloat(form.scontistica) : undefined,
                     note: form.note || undefined,
                   })
                 }
@@ -355,6 +398,7 @@ export default function FornitoriList() {
         <TabsList>
           <TabsTrigger value="fornitori">Fornitori ({fornitori.data?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="ordini">Ordini ({ordini.data?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="listini">Listini ({listiniQuery.data?.length ?? 0})</TabsTrigger>
         </TabsList>
 
         {/* ── Fornitori tab ──────────────────────────────────────────── */}
@@ -411,6 +455,12 @@ export default function FornitoriList() {
                           </span>
                         )}
                       </div>
+                      {(f.referenteCommerciale || f.scontistica) && (
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                          {f.referenteCommerciale && <span>Ref: {f.referenteCommerciale}</span>}
+                          {f.scontistica && <Badge variant="outline" className="text-[10px]">Sconto {f.scontistica}%</Badge>}
+                        </div>
+                      )}
                       {f.note && <p className="text-xs text-muted-foreground border-l-2 pl-2 mt-1">{f.note}</p>}
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
@@ -535,7 +585,123 @@ export default function FornitoriList() {
             )}
           </div>
         </TabsContent>
+
+        {/* ── Listini tab ────────────────────────────────────────────── */}
+        <TabsContent value="listini" className="space-y-4 mt-4">
+          <div className="flex justify-end">
+            <Button size="sm" onClick={() => setListinoDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-1" /> Nuovo listino
+            </Button>
+          </div>
+          <div className="grid gap-3">
+            {listiniQuery.data?.map((l: any) => {
+              const fornitoreNome = fornitori.data?.find((f: any) => f.id === l.fornitoreId)?.ragioneSociale ?? "?";
+              return (
+                <Card key={l.id}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium text-sm">{l.nome}</span>
+                          <Badge variant="secondary" className="text-[10px]">{l.versione}</Badge>
+                          <Badge variant="outline" className="text-[10px] uppercase">{l.tipo}</Badge>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          <span>{fornitoreNome}</span>
+                          <span>Valido dal: {l.dataValidita}</span>
+                          <span className="font-mono">{l.nomeFile}</span>
+                        </div>
+                        {l.note && <p className="text-xs text-muted-foreground mt-1">{l.note}</p>}
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-red-600" onClick={() => setDeleteTarget({ type: "listino", id: l.id, label: l.nome })}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+            {listiniQuery.data?.length === 0 && (
+              <div className="text-center py-12 text-muted-foreground text-sm">Nessun listino caricato.</div>
+            )}
+          </div>
+        </TabsContent>
       </Tabs>
+
+      {/* ── Nuovo listino dialog ───────────────────────────────────── */}
+      <Dialog open={listinoDialogOpen} onOpenChange={setListinoDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nuovo listino</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 py-2">
+            <div className="space-y-1.5">
+              <Label>Fornitore *</Label>
+              <Select value={listinoForm.fornitoreId} onValueChange={(v) => setListinoForm({ ...listinoForm, fornitoreId: v })}>
+                <SelectTrigger><SelectValue placeholder="Seleziona" /></SelectTrigger>
+                <SelectContent>
+                  {fornitori.data?.map((f: any) => (
+                    <SelectItem key={f.id} value={f.id.toString()}>{f.ragioneSociale}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Nome listino *</Label>
+                <Input value={listinoForm.nome} onChange={(e) => setListinoForm({ ...listinoForm, nome: e.target.value })} placeholder="Listino Profili 2026" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Versione *</Label>
+                <Input value={listinoForm.versione} onChange={(e) => setListinoForm({ ...listinoForm, versione: e.target.value })} placeholder="v1.0" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Data validita *</Label>
+                <Input type="date" value={listinoForm.dataValidita} onChange={(e) => setListinoForm({ ...listinoForm, dataValidita: e.target.value })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Tipo</Label>
+                <Select value={listinoForm.tipo} onValueChange={(v) => setListinoForm({ ...listinoForm, tipo: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pdf">PDF</SelectItem>
+                    <SelectItem value="excel">Excel</SelectItem>
+                    <SelectItem value="altro">Altro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Nome file *</Label>
+              <Input value={listinoForm.nomeFile} onChange={(e) => setListinoForm({ ...listinoForm, nomeFile: e.target.value })} placeholder="listino_2026.pdf" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Note</Label>
+              <Input value={listinoForm.note} onChange={(e) => setListinoForm({ ...listinoForm, note: e.target.value })} />
+            </div>
+            <Button
+              onClick={() => {
+                if (!listinoForm.fornitoreId || !listinoForm.nome || !listinoForm.versione || !listinoForm.dataValidita || !listinoForm.nomeFile) return;
+                createListino.mutate({
+                  fornitoreId: parseInt(listinoForm.fornitoreId),
+                  nome: listinoForm.nome,
+                  versione: listinoForm.versione,
+                  dataValidita: listinoForm.dataValidita,
+                  nomeFile: listinoForm.nomeFile,
+                  tipo: listinoForm.tipo as any,
+                  note: listinoForm.note || undefined,
+                });
+              }}
+              disabled={createListino.isPending}
+            >
+              Crea listino
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Edit fornitore dialog ─────────────────────────────────── */}
       <Dialog open={editOpen} onOpenChange={(o) => { setEditOpen(o); if (!o) setEditId(null); }}>
@@ -585,6 +751,16 @@ export default function FornitoriList() {
                 <Input value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} />
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Referente commerciale</Label>
+                <Input value={editForm.referenteCommerciale} onChange={(e) => setEditForm({ ...editForm, referenteCommerciale: e.target.value })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Sconto %</Label>
+                <Input type="number" step="0.5" value={editForm.scontistica} onChange={(e) => setEditForm({ ...editForm, scontistica: e.target.value })} />
+              </div>
+            </div>
             <div className="space-y-1.5">
               <Label>Note</Label>
               <Textarea rows={2} value={editForm.note} onChange={(e) => setEditForm({ ...editForm, note: e.target.value })} />
@@ -599,6 +775,8 @@ export default function FornitoriList() {
                 citta: editForm.citta || undefined,
                 telefono: editForm.telefono || undefined,
                 email: editForm.email || undefined,
+                referenteCommerciale: editForm.referenteCommerciale || undefined,
+                scontistica: editForm.scontistica ? parseFloat(editForm.scontistica) : undefined,
                 note: editForm.note || undefined,
               })}
               disabled={updateFornitore.isPending}
@@ -721,11 +899,12 @@ export default function FornitoriList() {
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(o) => !o && setDeleteTarget(null)}
-        title={deleteTarget?.type === "ordine" ? "Elimina ordine" : "Elimina fornitore"}
+        title={deleteTarget?.type === "ordine" ? "Elimina ordine" : deleteTarget?.type === "listino" ? "Elimina listino" : "Elimina fornitore"}
         description={`Eliminare "${deleteTarget?.label}"? Questa azione non puo essere annullata.`}
         onConfirm={() => {
           if (!deleteTarget) return;
           if (deleteTarget.type === "ordine") deleteOrdine.mutate(deleteTarget.id);
+          else if (deleteTarget.type === "listino") deleteListino.mutate(deleteTarget.id);
           else deleteFornitore.mutate(deleteTarget.id);
         }}
       />

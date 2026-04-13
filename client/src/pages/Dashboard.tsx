@@ -1,6 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Building2,
   AlertTriangle,
@@ -10,8 +11,11 @@ import {
   Shield,
   Users,
   Hammer,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useLocation } from "wouter";
+import { useState, useMemo } from "react";
 import {
   BarChart,
   Bar,
@@ -42,7 +46,7 @@ function StatCard({
 }) {
   return (
     <Card
-      className={`cursor-pointer transition-all hover:shadow-md ${accent ? "border-l-4 border-l-[oklch(0.577_0.245_27.325)]" : ""}`}
+      className={`cursor-pointer transition-all hover:shadow-md ${accent ? "border-l-4 border-l-destructive" : ""}`}
       onClick={onClick}
     >
       <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -61,7 +65,187 @@ function StatCard({
   );
 }
 
-const PIE_COLORS = ["#171717", "#dc2626", "#2563eb", "#059669", "#d97706", "#7c3aed"];
+const PIE_COLORS = ["#4f46e5", "#0d9488", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"];
+
+// ── Calendar types with colors (PRD Sez.11.2) ──
+const CALENDARI = [
+  { key: "rilievo", label: "Misure Esecutive", color: "#2563eb" },
+  { key: "posa", label: "Posa", color: "#059669" },
+  { key: "assistenza", label: "Interventi/Regolazioni", color: "#d97706" },
+  { key: "sopralluogo", label: "Showroom/Sopralluogo", color: "#7c3aed" },
+  { key: "altro", label: "Altro", color: "#6b7280" },
+] as const;
+
+const CALENDAR_COLOR_MAP: Record<string, string> = Object.fromEntries(
+  CALENDARI.map((c) => [c.key, c.color])
+);
+
+function getWeekDates(baseDate: Date): Date[] {
+  const d = new Date(baseDate);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday start
+  const monday = new Date(d);
+  monday.setDate(diff);
+  const dates: Date[] = [];
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + i);
+    dates.push(date);
+  }
+  return dates;
+}
+
+function formatDateKey(d: Date) {
+  return d.toISOString().split("T")[0];
+}
+
+const GIORNI = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"];
+const MESI = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"];
+
+function CalendarioSettimana({
+  interventi,
+  onEventClick,
+}: {
+  interventi: any[];
+  onEventClick: (i: any) => void;
+}) {
+  const [baseDate, setBaseDate] = useState(() => new Date());
+  const [activeCalendari, setActiveCalendari] = useState<Set<string>>(
+    () => new Set(CALENDARI.map((c) => c.key))
+  );
+
+  const weekDates = useMemo(() => getWeekDates(baseDate), [baseDate]);
+  const today = formatDateKey(new Date());
+
+  const eventiByDay = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    weekDates.forEach((d) => (map[formatDateKey(d)] = []));
+    interventi
+      .filter((i) => activeCalendari.has(i.tipo))
+      .forEach((i) => {
+        if (i.dataPianificata && map[i.dataPianificata]) {
+          map[i.dataPianificata].push(i);
+        }
+      });
+    return map;
+  }, [interventi, weekDates, activeCalendari]);
+
+  function prevWeek() {
+    setBaseDate((d) => {
+      const n = new Date(d);
+      n.setDate(n.getDate() - 7);
+      return n;
+    });
+  }
+  function nextWeek() {
+    setBaseDate((d) => {
+      const n = new Date(d);
+      n.setDate(n.getDate() + 7);
+      return n;
+    });
+  }
+  function goToday() {
+    setBaseDate(new Date());
+  }
+
+  function toggleCalendario(key: string) {
+    setActiveCalendari((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  const weekLabel = `${weekDates[0].getDate()} ${MESI[weekDates[0].getMonth()]} — ${weekDates[6].getDate()} ${MESI[weekDates[6].getMonth()]} ${weekDates[6].getFullYear()}`;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <CalendarClock className="h-4 w-4" />
+            Calendario settimanale
+          </CardTitle>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={prevWeek}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={goToday}>
+              Oggi
+            </Button>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={nextWeek}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+        <p className="text-sm text-muted-foreground">{weekLabel}</p>
+        {/* Calendar filters */}
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {CALENDARI.map((cal) => (
+            <button
+              key={cal.key}
+              onClick={() => toggleCalendario(cal.key)}
+              className={`inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border transition-all ${
+                activeCalendari.has(cal.key)
+                  ? "border-transparent text-white"
+                  : "border-border text-muted-foreground bg-background"
+              }`}
+              style={
+                activeCalendari.has(cal.key)
+                  ? { backgroundColor: cal.color }
+                  : undefined
+              }
+            >
+              {cal.label}
+            </button>
+          ))}
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-7 gap-1">
+          {weekDates.map((d, idx) => {
+            const key = formatDateKey(d);
+            const isToday = key === today;
+            const dayEvents = eventiByDay[key] ?? [];
+            return (
+              <div key={key} className="min-h-[100px]">
+                <div
+                  className={`text-center text-xs font-medium py-1 rounded-t ${
+                    isToday
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  <div>{GIORNI[idx]}</div>
+                  <div className={`text-base font-bold ${isToday ? "" : "text-foreground"}`}>
+                    {d.getDate()}
+                  </div>
+                </div>
+                <div className="space-y-1 mt-1">
+                  {dayEvents.map((ev: any) => (
+                    <div
+                      key={ev.id}
+                      onClick={() => onEventClick(ev)}
+                      className="text-[10px] leading-tight p-1 rounded cursor-pointer hover:opacity-80 transition-opacity text-white truncate"
+                      style={{ backgroundColor: CALENDAR_COLOR_MAP[ev.tipo] ?? "#6b7280" }}
+                      title={ev.note}
+                    >
+                      {ev.note}
+                    </div>
+                  ))}
+                  {dayEvents.length === 0 && (
+                    <div className="text-[10px] text-muted-foreground text-center py-2">—</div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
@@ -193,6 +377,18 @@ export default function Dashboard() {
         />
       </div>
 
+      {/* Calendar - primary element (PRD Sez.11) */}
+      <CalendarioSettimana
+        interventi={interventiSettimana.data ?? []}
+        onEventClick={(ev) => {
+          if (ev.tipo === "posa" || ev.tipo === "assistenza") {
+            setLocation(`/posa/${ev.id}`);
+          } else {
+            setLocation("/planning");
+          }
+        }}
+      />
+
       {/* Charts Row */}
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Interventi by tipo */}
@@ -210,7 +406,7 @@ export default function Dashboard() {
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
                   <Tooltip />
-                  <Bar dataKey="valore" fill="#171717" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="valore" fill="#4f46e5" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -279,8 +475,8 @@ export default function Dashboard() {
                 <YAxis type="category" dataKey="nome" tick={{ fontSize: 12 }} width={120} />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="attivi" name="Attivi" fill="#171717" stackId="a" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="completati" name="Completati" fill="#d1d5db" stackId="a" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="attivi" name="Attivi" fill="#4f46e5" stackId="a" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="completati" name="Completati" fill="#0d9488" stackId="a" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -367,7 +563,7 @@ export default function Dashboard() {
                       {c.priorita === "alta" && (
                         <Badge
                           variant="outline"
-                          className="text-[10px] px-1.5 py-0 border-[oklch(0.577_0.245_27.325)] text-[oklch(0.577_0.245_27.325)]"
+                          className="text-[10px] px-1.5 py-0 border-destructive text-destructive"
                         >
                           ALTA
                         </Badge>
@@ -387,9 +583,9 @@ export default function Dashboard() {
 
       {/* Quick anomalies view */}
       {(as_?.critiche ?? 0) > 0 && (
-        <Card className="border-[oklch(0.577_0.245_27.325)]/30 bg-[oklch(0.577_0.245_27.325)]/5">
+        <Card className="border-destructive/30 bg-destructive/5">
           <CardHeader>
-            <CardTitle className="text-base font-semibold flex items-center gap-2 text-[oklch(0.577_0.245_27.325)]">
+            <CardTitle className="text-base font-semibold flex items-center gap-2 text-destructive">
               <AlertTriangle className="h-4 w-4" />
               Anomalie critiche da gestire
             </CardTitle>

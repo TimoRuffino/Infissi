@@ -6,7 +6,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Bell, AlertTriangle, Clock, Shield, Hammer } from "lucide-react";
+import { Bell, AlertTriangle, Clock, Shield, Hammer, Truck, MessageSquareWarning } from "lucide-react";
 import { useMemo } from "react";
 import { useLocation } from "wouter";
 
@@ -21,13 +21,17 @@ type Notification = {
 
 export default function NotificheDropdown() {
   const [, setLocation] = useLocation();
-  const anomalieStats = trpc.anomalie.stats.useQuery();
-  const garanzieStats = trpc.garanzie.stats.useQuery();
+  const refetchOpts = { refetchInterval: 30000 }; // 30s auto-sync
+  const anomalieStats = trpc.anomalie.stats.useQuery(undefined, refetchOpts);
+  const garanzieStats = trpc.garanzie.stats.useQuery(undefined, refetchOpts);
   const interventiOggi = trpc.interventi.list.useQuery({
     from: new Date().toISOString().split("T")[0],
     to: new Date().toISOString().split("T")[0],
-  });
-  const ticketStats = trpc.ticket.stats.useQuery();
+  }, refetchOpts);
+  const ticketStats = trpc.ticket.stats.useQuery(undefined, refetchOpts);
+  const reclamiStats = trpc.reclamiRifacimenti.reclami.stats.useQuery(undefined, refetchOpts);
+  const rifacimentiStats = trpc.reclamiRifacimenti.rifacimenti.stats.useQuery(undefined, refetchOpts);
+  const fornitoriStats = trpc.fornitori.stats.useQuery(undefined, refetchOpts);
 
   const notifications = useMemo(() => {
     const items: Notification[] = [];
@@ -92,14 +96,50 @@ export default function NotificheDropdown() {
       });
     }
 
+    const reclamiAperti = (reclamiStats.data?.aperti ?? 0) + (reclamiStats.data?.inGestione ?? 0);
+    if (reclamiAperti > 0) {
+      items.push({
+        id: "reclami-aperti",
+        icon: MessageSquareWarning,
+        title: `${reclamiAperti} reclami aperti`,
+        detail: "Da gestire",
+        type: "warning",
+        path: "/reclami",
+      });
+    }
+
+    const rifAperti = (rifacimentiStats.data?.aperti ?? 0) + (rifacimentiStats.data?.inGestione ?? 0);
+    if (rifAperti > 0) {
+      items.push({
+        id: "rifacimenti-aperti",
+        icon: AlertTriangle,
+        title: `${rifAperti} rifacimenti aperti`,
+        detail: `Costo stimato: €${rifacimentiStats.data?.costoTotaleStimato?.toLocaleString("it-IT") ?? 0}`,
+        type: "danger",
+        path: "/reclami",
+      });
+    }
+
+    const ordiniAttivi = fornitoriStats.data?.ordiniAttivi ?? 0;
+    if (ordiniAttivi > 0) {
+      items.push({
+        id: "ordini-attivi",
+        icon: Truck,
+        title: `${ordiniAttivi} ordini in corso`,
+        detail: `Importo: €${(fornitoriStats.data?.importoPendente ?? 0).toLocaleString("it-IT")}`,
+        type: "info",
+        path: "/fornitori",
+      });
+    }
+
     return items;
-  }, [anomalieStats.data, garanzieStats.data, interventiOggi.data, ticketStats.data]);
+  }, [anomalieStats.data, garanzieStats.data, interventiOggi.data, ticketStats.data, reclamiStats.data, rifacimentiStats.data, fornitoriStats.data]);
 
   const dangerCount = notifications.filter((n) => n.type === "danger").length;
   const totalCount = notifications.length;
 
   const typeColors = {
-    danger: "text-[oklch(0.577_0.245_27.325)]",
+    danger: "text-destructive",
     warning: "text-amber-600",
     info: "text-blue-600",
   };
@@ -111,7 +151,7 @@ export default function NotificheDropdown() {
           <Bell className="h-4 w-4 text-muted-foreground" />
           {totalCount > 0 && (
             <span
-              className={`absolute -top-0.5 -right-0.5 h-4 min-w-4 px-0.5 flex items-center justify-center rounded-full text-[9px] font-bold text-white ${dangerCount > 0 ? "bg-[oklch(0.577_0.245_27.325)]" : "bg-amber-500"}`}
+              className={`absolute -top-0.5 -right-0.5 h-4 min-w-4 px-0.5 flex items-center justify-center rounded-full text-[9px] font-bold text-white ${dangerCount > 0 ? "bg-destructive" : "bg-amber-500"}`}
             >
               {totalCount}
             </span>

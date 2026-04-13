@@ -25,7 +25,7 @@ export default function Integrazioni() {
     tenantId: "",
     autoCreateTasks: true,
     syncBidirectional: true,
-    defaultList: "Infissi Ops",
+    defaultList: "Ruffino Cartelléttà",
   });
   const [calendarConfig, setCalendarConfig] = useState({
     clientId: "",

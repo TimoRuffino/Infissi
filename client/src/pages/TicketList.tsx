@@ -304,22 +304,22 @@ export default function TicketList() {
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     {t.stato === "aperto" && (
-                      <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => updateStato.mutate({ id: t.id, stato: "assegnato" })}>
+                      <Button variant="outline" size="sm" className="text-xs h-7" disabled={updateStato.isPending} onClick={() => updateStato.mutate({ id: t.id, stato: "assegnato" })}>
                         Assegna
                       </Button>
                     )}
                     {t.stato === "assegnato" && (
-                      <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => updateStato.mutate({ id: t.id, stato: "in_lavorazione" })}>
+                      <Button variant="outline" size="sm" className="text-xs h-7" disabled={updateStato.isPending} onClick={() => updateStato.mutate({ id: t.id, stato: "in_lavorazione" })}>
                         Lavora
                       </Button>
                     )}
                     {t.stato === "in_lavorazione" && (
-                      <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => updateStato.mutate({ id: t.id, stato: "risolto" })}>
+                      <Button variant="outline" size="sm" className="text-xs h-7" disabled={updateStato.isPending} onClick={() => updateStato.mutate({ id: t.id, stato: "risolto" })}>
                         Risolvi
                       </Button>
                     )}
                     {t.stato === "risolto" && (
-                      <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => updateStato.mutate({ id: t.id, stato: "chiuso" })}>
+                      <Button variant="outline" size="sm" className="text-xs h-7" disabled={updateStato.isPending} onClick={() => updateStato.mutate({ id: t.id, stato: "chiuso" })}>
                         Chiudi
                       </Button>
                     )}

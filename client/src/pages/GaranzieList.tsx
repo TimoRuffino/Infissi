@@ -320,7 +320,7 @@ export default function GaranzieList() {
         <Card
           className={
             (s?.scadute ?? 0) > 0
-              ? "border-l-4 border-l-[oklch(0.577_0.245_27.325)]"
+              ? "border-l-4 border-l-destructive"
               : ""
           }
         >
@@ -328,7 +328,7 @@ export default function GaranzieList() {
             <p className="text-xs text-muted-foreground uppercase tracking-wide">
               Scadute
             </p>
-            <p className="text-2xl font-bold text-[oklch(0.577_0.245_27.325)]">
+            <p className="text-2xl font-bold text-destructive">
               {s?.scadute ?? "—"}
             </p>
           </CardContent>

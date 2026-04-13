@@ -497,17 +497,17 @@ export default function Produzione() {
                   </div>
                   <div className="flex flex-col gap-1.5 shrink-0">
                     {nc.stato === "aperta" && (
-                      <Button size="sm" variant="outline" onClick={() => updateNcStato.mutate({ id: nc.id, stato: "in_gestione" })}>
+                      <Button size="sm" variant="outline" disabled={updateNcStato.isPending} onClick={() => updateNcStato.mutate({ id: nc.id, stato: "in_gestione" })}>
                         In gestione
                       </Button>
                     )}
                     {nc.stato === "in_gestione" && (
-                      <Button size="sm" variant="outline" onClick={() => updateNcStato.mutate({ id: nc.id, stato: "risolta" })}>
+                      <Button size="sm" variant="outline" disabled={updateNcStato.isPending} onClick={() => updateNcStato.mutate({ id: nc.id, stato: "risolta" })}>
                         Risolta
                       </Button>
                     )}
                     {nc.stato === "risolta" && (
-                      <Button size="sm" onClick={() => updateNcStato.mutate({ id: nc.id, stato: "chiusa" })}>
+                      <Button size="sm" disabled={updateNcStato.isPending} onClick={() => updateNcStato.mutate({ id: nc.id, stato: "chiusa" })}>
                         Chiudi
                       </Button>
                     )}

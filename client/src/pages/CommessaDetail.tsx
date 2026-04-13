@@ -40,6 +40,7 @@ import {
 import { useState } from "react";
 import { useLocation, useParams } from "wouter";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import TimelineOrdine from "@/components/TimelineOrdine";
 
 const statoAperturaColors: Record<string, string> = {
   da_rilevare: "bg-gray-100 text-gray-700",
@@ -183,8 +184,11 @@ export default function CommessaDetail() {
             )}
             {c.stato !== "archiviata" && (() => {
               const next: Record<string, string> = {
-                preventivo: "aperta", aperta: "in_rilievo", in_rilievo: "in_lavorazione",
-                in_lavorazione: "in_produzione", in_produzione: "in_posa", in_posa: "chiusa", chiusa: "archiviata",
+                preventivo: "misure_esecutive", misure_esecutive: "aggiornamento_contratto",
+                aggiornamento_contratto: "fatture_pagamento", fatture_pagamento: "da_ordinare",
+                da_ordinare: "produzione", produzione: "ordini_ultimazione",
+                ordini_ultimazione: "attesa_posa", attesa_posa: "finiture_saldo",
+                finiture_saldo: "interventi_regolazioni", interventi_regolazioni: "archiviata",
               };
               const nextStato = next[c.stato];
               return nextStato ? (
@@ -254,6 +258,9 @@ export default function CommessaDetail() {
           </TabsTrigger>
           <TabsTrigger value="anomalie">
             Anomalie ({anomalie.data?.length ?? 0})
+          </TabsTrigger>
+          <TabsTrigger value="timeline">
+            Timeline ordine
           </TabsTrigger>
         </TabsList>
 
@@ -516,7 +523,7 @@ export default function CommessaDetail() {
                           </p>
                         )}
                         {a.criticitaAccesso && (
-                          <p className="text-xs text-[oklch(0.577_0.245_27.325)] flex items-center gap-1 mt-1">
+                          <p className="text-xs text-destructive flex items-center gap-1 mt-1">
                             <AlertTriangle className="h-3 w-3" />
                             {a.criticitaAccesso}
                           </p>
@@ -710,7 +717,7 @@ export default function CommessaDetail() {
                   key={a.id}
                   className={
                     a.priorita === "critica"
-                      ? "border-[oklch(0.577_0.245_27.325)]/40"
+                      ? "border-destructive/40"
                       : ""
                   }
                 >
@@ -755,6 +762,11 @@ export default function CommessaDetail() {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        {/* Timeline ordine tab */}
+        <TabsContent value="timeline" className="mt-4">
+          <TimelineOrdine commessaId={commessaId} />
         </TabsContent>
       </Tabs>
 

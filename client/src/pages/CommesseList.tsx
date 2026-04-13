@@ -28,12 +28,15 @@ type DeleteTarget = { id: number; label: string } | null;
 
 const statoColors: Record<string, string> = {
   preventivo: "bg-slate-100 text-slate-700",
-  aperta: "bg-blue-100 text-blue-800",
-  in_rilievo: "bg-amber-100 text-amber-800",
-  in_lavorazione: "bg-purple-100 text-purple-800",
-  in_produzione: "bg-indigo-100 text-indigo-800",
-  in_posa: "bg-orange-100 text-orange-800",
-  chiusa: "bg-green-100 text-green-800",
+  misure_esecutive: "bg-blue-100 text-blue-800",
+  aggiornamento_contratto: "bg-cyan-100 text-cyan-800",
+  fatture_pagamento: "bg-amber-100 text-amber-800",
+  da_ordinare: "bg-yellow-100 text-yellow-800",
+  produzione: "bg-indigo-100 text-indigo-800",
+  ordini_ultimazione: "bg-purple-100 text-purple-800",
+  attesa_posa: "bg-orange-100 text-orange-800",
+  finiture_saldo: "bg-green-100 text-green-800",
+  interventi_regolazioni: "bg-teal-100 text-teal-800",
   archiviata: "bg-gray-100 text-gray-600",
 };
 
@@ -305,12 +308,15 @@ export default function CommesseList() {
           <SelectContent>
             <SelectItem value="tutti">Tutti gli stati</SelectItem>
             <SelectItem value="preventivo">Preventivo</SelectItem>
-            <SelectItem value="aperta">Aperta</SelectItem>
-            <SelectItem value="in_rilievo">In rilievo</SelectItem>
-            <SelectItem value="in_lavorazione">In lavorazione</SelectItem>
-            <SelectItem value="in_produzione">In produzione</SelectItem>
-            <SelectItem value="in_posa">In posa</SelectItem>
-            <SelectItem value="chiusa">Chiusa</SelectItem>
+            <SelectItem value="misure_esecutive">Misure esecutive</SelectItem>
+            <SelectItem value="aggiornamento_contratto">Agg. contratto</SelectItem>
+            <SelectItem value="fatture_pagamento">Fatture/Pagamento</SelectItem>
+            <SelectItem value="da_ordinare">Da ordinare</SelectItem>
+            <SelectItem value="produzione">Produzione</SelectItem>
+            <SelectItem value="ordini_ultimazione">Ordini ultimazione</SelectItem>
+            <SelectItem value="attesa_posa">Attesa posa</SelectItem>
+            <SelectItem value="finiture_saldo">Finiture/Saldo</SelectItem>
+            <SelectItem value="interventi_regolazioni">Interventi/Regolaz.</SelectItem>
             <SelectItem value="archiviata">Archiviata</SelectItem>
           </SelectContent>
         </Select>
@@ -339,7 +345,7 @@ export default function CommesseList() {
                     {(c.priorita === "urgente" || c.priorita === "alta") && (
                       <Badge
                         variant={prioritaStyle[c.priorita] as any}
-                        className={`text-[10px] px-1.5 py-0 ${c.priorita === "alta" ? "border-[oklch(0.577_0.245_27.325)] text-[oklch(0.577_0.245_27.325)]" : ""}`}
+                        className={`text-[10px] px-1.5 py-0 ${c.priorita === "alta" ? "border-destructive text-destructive" : ""}`}
                       >
                         {c.priorita.toUpperCase()}
                       </Badge>

@@ -306,7 +306,7 @@ export default function VerbaleChiusura() {
                 Anomalie aperte
               </span>
               <span
-                className={`font-semibold ${anomalieList.length > 0 ? "text-[oklch(0.577_0.245_27.325)]" : ""}`}
+                className={`font-semibold ${anomalieList.length > 0 ? "text-destructive" : ""}`}
               >
                 {anomalieList.length}
               </span>
@@ -408,9 +408,9 @@ export default function VerbaleChiusura() {
 
       {/* Anomalie aperte warning */}
       {anomalieList.length > 0 && (
-        <Card className="border-[oklch(0.577_0.245_27.325)]/30 bg-[oklch(0.577_0.245_27.325)]/5">
+        <Card className="border-destructive/30 bg-destructive/5">
           <CardContent className="p-4">
-            <p className="text-sm font-medium text-[oklch(0.577_0.245_27.325)]">
+            <p className="text-sm font-medium text-destructive">
               Attenzione: {anomalieList.length} anomalie non risolte verranno
               registrate nel verbale.
             </p>
