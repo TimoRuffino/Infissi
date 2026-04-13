@@ -3,18 +3,34 @@ import { publicProcedure, router } from "../_core/trpc";
 import { addCommessaToCliente } from "./clienti";
 
 // ── State machine: allowed transitions ──────────────────────────────────────
-const STATI_COMMESSA = ["preventivo", "aperta", "in_rilievo", "in_lavorazione", "in_produzione", "in_posa", "chiusa", "archiviata"] as const;
+const STATI_COMMESSA = [
+  "preventivo",
+  "misure_esecutive",
+  "aggiornamento_contratto",
+  "fatture_pagamento",
+  "da_ordinare",
+  "produzione",
+  "ordini_ultimazione",
+  "attesa_posa",
+  "finiture_saldo",
+  "interventi_regolazioni",
+  "archiviata",
+] as const;
 type StatoCommessa = typeof STATI_COMMESSA[number];
 
+// Forward + backward (prev step) transitions allowed
 const TRANSIZIONI_VALIDE: Record<StatoCommessa, StatoCommessa[]> = {
-  preventivo:       ["aperta"],
-  aperta:           ["in_rilievo"],
-  in_rilievo:       ["in_lavorazione"],
-  in_lavorazione:   ["in_produzione"],
-  in_produzione:    ["in_posa"],
-  in_posa:          ["chiusa"],
-  chiusa:           ["archiviata"],
-  archiviata:       [],
+  preventivo:              ["misure_esecutive"],
+  misure_esecutive:        ["preventivo", "aggiornamento_contratto"],
+  aggiornamento_contratto: ["misure_esecutive", "fatture_pagamento"],
+  fatture_pagamento:       ["aggiornamento_contratto", "da_ordinare"],
+  da_ordinare:             ["fatture_pagamento", "produzione"],
+  produzione:              ["da_ordinare", "ordini_ultimazione"],
+  ordini_ultimazione:      ["produzione", "attesa_posa"],
+  attesa_posa:             ["ordini_ultimazione", "finiture_saldo"],
+  finiture_saldo:          ["attesa_posa", "interventi_regolazioni"],
+  interventi_regolazioni:  ["finiture_saldo", "archiviata"],
+  archiviata:              ["interventi_regolazioni"],
 };
 
 function validateTransizione(statoAttuale: string, nuovoStato: string): void {
@@ -38,7 +54,7 @@ let commesse: any[] = [
     citta: "Palermo",
     telefono: "091 123 4567",
     email: "admin@condominioroma15.it",
-    stato: "in_posa",
+    stato: "attesa_posa",
     priorita: "alta",
     squadraId: 1,
     dataApertura: "2026-02-10",
@@ -57,7 +73,7 @@ let commesse: any[] = [
     citta: "Palermo",
     telefono: "091 987 6543",
     email: "ferrara@gmail.com",
-    stato: "in_rilievo",
+    stato: "misure_esecutive",
     priorita: "media",
     squadraId: null,
     dataApertura: "2026-03-20",
@@ -76,7 +92,7 @@ let commesse: any[] = [
     citta: "Palermo",
     telefono: "091 555 1234",
     email: "info@moretti.it",
-    stato: "aperta",
+    stato: "preventivo",
     priorita: "bassa",
     squadraId: null,
     dataApertura: "2026-04-05",
@@ -95,7 +111,7 @@ let commesse: any[] = [
     citta: "Palermo",
     telefono: "091 333 7890",
     email: "segreteria@scuolapirandello.edu.it",
-    stato: "chiusa",
+    stato: "finiture_saldo",
     priorita: "urgente",
     squadraId: 2,
     dataApertura: "2025-11-01",
@@ -114,7 +130,7 @@ let commesse: any[] = [
     citta: "Palermo",
     telefono: "091 444 5678",
     email: "direz@blumare.it",
-    stato: "in_lavorazione",
+    stato: "produzione",
     priorita: "alta",
     squadraId: 1,
     dataApertura: "2026-03-01",
@@ -180,7 +196,7 @@ export const commesseRouter = router({
         id,
         clienteId: inputClienteId ?? null,
         ...rest,
-        stato: "aperta" as const,
+        stato: "preventivo" as const,
         priorita: input.priorita ?? "media",
         squadraId: null,
         dataApertura: now.toISOString().split("T")[0],
@@ -206,7 +222,7 @@ export const commesseRouter = router({
         citta: z.string().optional(),
         telefono: z.string().optional(),
         email: z.string().optional(),
-        stato: z.enum(["preventivo", "aperta", "in_rilievo", "in_lavorazione", "in_produzione", "in_posa", "chiusa", "archiviata"]).optional(),
+        stato: z.enum(["preventivo", "misure_esecutive", "aggiornamento_contratto", "fatture_pagamento", "da_ordinare", "produzione", "ordini_ultimazione", "attesa_posa", "finiture_saldo", "interventi_regolazioni", "archiviata"]).optional(),
         priorita: z.enum(["bassa", "media", "alta", "urgente"]).optional(),
         squadraId: z.number().nullable().optional(),
         note: z.string().optional(),
@@ -222,7 +238,7 @@ export const commesseRouter = router({
       }
       const { id, ...updates } = input;
       commesse[idx] = { ...commesse[idx], ...updates, updatedAt: new Date() };
-      if (input.stato === "chiusa") {
+      if (input.stato === "archiviata") {
         commesse[idx].dataChiusura = new Date().toISOString().split("T")[0];
       }
       return commesse[idx];
@@ -237,14 +253,14 @@ export const commesseRouter = router({
 
   stats: publicProcedure.query(() => {
     const total = commesse.length;
-    const aperte = commesse.filter((c) => c.stato === "aperta").length;
+    const preventivi = commesse.filter((c) => c.stato === "preventivo").length;
     const inCorso = commesse.filter((c) =>
-      ["in_rilievo", "in_lavorazione", "in_produzione", "in_posa"].includes(c.stato)
+      !["preventivo", "finiture_saldo", "interventi_regolazioni", "archiviata"].includes(c.stato)
     ).length;
-    const chiuse = commesse.filter((c) => ["chiusa", "archiviata"].includes(c.stato)).length;
+    const chiuse = commesse.filter((c) => ["finiture_saldo", "interventi_regolazioni", "archiviata"].includes(c.stato)).length;
     const urgenti = commesse.filter(
-      (c) => c.priorita === "urgente" && c.stato !== "chiusa" && c.stato !== "archiviata"
+      (c) => c.priorita === "urgente" && c.stato !== "archiviata"
     ).length;
-    return { total, aperte, inCorso, chiuse, urgenti };
+    return { total, preventivi, inCorso, chiuse, urgenti };
   }),
 });

@@ -11,7 +11,9 @@ type Fornitore = {
   citta?: string;
   telefono?: string;
   email?: string;
-  categoria: "profili" | "vetri" | "ferramenta" | "accessori" | "guarnizioni" | "altro";
+  categoria: "pvc" | "alluminio" | "vetro" | "ferramenta" | "persiane" | "blindati" | "accessori" | "guarnizioni" | "altro";
+  referenteCommerciale?: string;
+  scontistica?: number; // % sconto
   note?: string;
   attivo: boolean;
   createdAt: Date;
@@ -59,7 +61,9 @@ let fornitori: Fornitore[] = [
     citta: "Bologna",
     telefono: "051 600 1234",
     email: "ordini@schuco.it",
-    categoria: "profili",
+    categoria: "alluminio",
+    referenteCommerciale: "Paolo Bianchi",
+    scontistica: 15,
     note: "Fornitore principale profili alluminio. Lead time 3-4 settimane.",
     attivo: true,
     createdAt: new Date("2025-06-01"),
@@ -73,7 +77,9 @@ let fornitori: Fornitore[] = [
     citta: "Catania",
     telefono: "095 789 0123",
     email: "commerciale@vetrosud.it",
-    categoria: "vetri",
+    categoria: "vetro",
+    referenteCommerciale: "Maria Greco",
+    scontistica: 10,
     note: "Vetri basso-emissivi e stratificati. Consegna 10gg lavorativi.",
     attivo: true,
     createdAt: new Date("2025-08-01"),
@@ -88,6 +94,8 @@ let fornitori: Fornitore[] = [
     telefono: "+49 711 7598 0",
     email: "orders@roto-frank.com",
     categoria: "ferramenta",
+    referenteCommerciale: "Hans Weber",
+    scontistica: 8,
     note: "Ferramenta anta-ribalta, cerniere, maniglie. Ordine minimo €500.",
     attivo: true,
     createdAt: new Date("2025-09-15"),
@@ -165,6 +173,25 @@ let ordini: OrdineFornitore[] = [
   },
 ];
 
+type Listino = {
+  id: number;
+  fornitoreId: number;
+  nome: string;
+  versione: string;
+  dataValidita: string;
+  nomeFile: string;
+  tipo: "pdf" | "excel" | "altro";
+  note?: string;
+  createdAt: Date;
+};
+
+let listini: Listino[] = [
+  { id: 1, fornitoreId: 1, nome: "Listino Profili ASS 2026", versione: "v2.1", dataValidita: "2026-01-01", nomeFile: "schuco_listino_2026_v2.1.pdf", tipo: "pdf", note: "Aggiornamento prezzi Q1 2026", createdAt: new Date("2026-01-05") },
+  { id: 2, fornitoreId: 1, nome: "Listino Profili ASS 2025", versione: "v1.0", dataValidita: "2025-01-01", nomeFile: "schuco_listino_2025.pdf", tipo: "pdf", createdAt: new Date("2025-01-10") },
+  { id: 3, fornitoreId: 2, nome: "Listino Vetri 2026", versione: "v1.0", dataValidita: "2026-03-01", nomeFile: "vetrosud_listino_2026.xlsx", tipo: "excel", note: "Inclusi nuovi vetri selettivi", createdAt: new Date("2026-03-01") },
+];
+let nextListinoId = 4;
+
 let nextFornitoreId = 5;
 let nextOrdineId = 4;
 let nextRigaId = 10;
@@ -210,7 +237,9 @@ export const fornitoriRouter = router({
         citta: z.string().optional(),
         telefono: z.string().optional(),
         email: z.string().optional(),
-        categoria: z.enum(["profili", "vetri", "ferramenta", "accessori", "guarnizioni", "altro"]),
+        categoria: z.enum(["pvc", "alluminio", "vetro", "ferramenta", "persiane", "blindati", "accessori", "guarnizioni", "altro"]),
+        referenteCommerciale: z.string().optional(),
+        scontistica: z.number().optional(),
         note: z.string().optional(),
       })
     )
@@ -237,7 +266,9 @@ export const fornitoriRouter = router({
         citta: z.string().optional(),
         telefono: z.string().optional(),
         email: z.string().optional(),
-        categoria: z.enum(["profili", "vetri", "ferramenta", "accessori", "guarnizioni", "altro"]).optional(),
+        categoria: z.enum(["pvc", "alluminio", "vetro", "ferramenta", "persiane", "blindati", "accessori", "guarnizioni", "altro"]).optional(),
+        referenteCommerciale: z.string().optional(),
+        scontistica: z.number().optional(),
         note: z.string().optional(),
         attivo: z.boolean().optional(),
       })
@@ -393,6 +424,44 @@ export const fornitoriRouter = router({
       const idx = ordini.findIndex((o) => o.id === input);
       if (idx === -1) throw new Error("Ordine non trovato");
       ordini.splice(idx, 1);
+      return { success: true };
+    }),
+  }),
+
+  // ── Listini ──────────────────────────────────────────────────────────────
+  listini: router({
+    list: publicProcedure
+      .input(z.object({ fornitoreId: z.number().optional() }).optional())
+      .query(({ input }) => {
+        let result = [...listini];
+        if (input?.fornitoreId) result = result.filter((l) => l.fornitoreId === input.fornitoreId);
+        return result.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      }),
+
+    create: publicProcedure
+      .input(z.object({
+        fornitoreId: z.number(),
+        nome: z.string().min(1),
+        versione: z.string().min(1),
+        dataValidita: z.string(),
+        nomeFile: z.string().min(1),
+        tipo: z.enum(["pdf", "excel", "altro"]),
+        note: z.string().optional(),
+      }))
+      .mutation(({ input }) => {
+        const listino: Listino = {
+          id: nextListinoId++,
+          ...input,
+          createdAt: new Date(),
+        };
+        listini.push(listino);
+        return listino;
+      }),
+
+    delete: publicProcedure.input(z.number()).mutation(({ input }) => {
+      const idx = listini.findIndex((l) => l.id === input);
+      if (idx === -1) throw new Error("Listino non trovato");
+      listini.splice(idx, 1);
       return { success: true };
     }),
   }),
